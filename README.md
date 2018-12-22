@@ -88,8 +88,8 @@ export DISPLAY=:99
 git clone http://source.ffmpeg.org/git/ffmpeg.git ffmpeg
 cd ffmpeg
 
-ln -s ~/ffmpeg-gl-transition/vf_gltransition.c libavfilter/
-git apply ~/ffmpeg-gl-transition/ffmpeg.diff
+cp ../ffmpeg-gl-transition/vf_gltransition.c libavfilter/
+git apply ../ffmpeg-gl-transition/ffmpeg.diff
 
 ```
 
