@@ -385,11 +385,12 @@ static void setup_uniforms(AVFilterLink *fromLink)
   c->_toR = glGetUniformLocation(c->program, "_toR");
   glUniform1f(c->_toR, fromLink->w / (float)fromLink->h);
 
-  StringArray_t sa = parseQueryString(c->uniforms);
-  if(sa.len >0){
-    for(int i = 0;i<sa.len;i+=2){
-      GLint location = glGetUniformLocation(c->program, sa.strings[i]);
-      if (location >= 0) {
+  if(c->uniforms){
+    StringArray_t sa = parseQueryString(c->uniforms);
+    if(sa.len >0){
+      for(int i = 0;i<sa.len;i+=2){
+        GLint location = glGetUniformLocation(c->program, sa.strings[i]);
+        if (location >= 0) {
           int intVar;
           float floatVar;
           int vecShape = 0;
@@ -434,9 +435,10 @@ static void setup_uniforms(AVFilterLink *fromLink)
                  sa.strings[i + 1]);
         }
       }
-    //free strings;
-    for (int i = 0; i < sa.len; i++) {
-      free(sa.strings[i]);
+      //free strings;
+      for (int i = 0; i < sa.len; i++) {
+        free(sa.strings[i]);
+      }
     }
   }
 }
