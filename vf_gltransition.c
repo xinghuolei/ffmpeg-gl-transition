@@ -206,7 +206,7 @@ static void strSplit##Type(const char *strLiteral, const char *delimiter, type *
   char *token, *str, *tofree;                                                           \
   int offset = 0;                                                                       \
   tofree = str = strdup(strLiteral);                                                    \
-  while ((token = strsep(&str, delimiter)) && offset < len) {                           \
+  while ((token = strtok(&str, delimiter)) && offset < len) {                           \
     type t;                                                                             \
     if (!strTo##Type(token, &t)) {                                                      \
       t = (type)0;                                                                      \
@@ -489,7 +489,11 @@ static int setup_gl(AVFilterLink *inLink)
 
 #ifndef __APPLE__
   glewExperimental = GL_TRUE;
-  glewInit();
+  GLenum err = glewInit();
+  if(err != GLEW_OK){
+    av_log(ctx,AV_LOG_ERROR,"%s",glewGetErrorString(err));
+    return -1;
+  }
 #endif
 
   glViewport(0, 0, inLink->w, inLink->h);

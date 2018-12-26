@@ -76,9 +76,10 @@ On headless environments without EGL, you'll also need to install `xvfb`.
 
 ```bash
 pkg install xorg-vfbserver (FreeBSD)
-apt install xvfb (Ubuntu)
+apt-get install xvfb (Ubuntu)
+yum install xorg-x11-server-Xvfb (CentOs)
 
-Xvfb :1 -screen 0 1280x1024x16
+Xvfb :99 -screen 0 1280x1024x16 &
 export DISPLAY=:99
 ```
 
