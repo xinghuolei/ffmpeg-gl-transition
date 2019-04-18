@@ -34,7 +34,7 @@
 #define FROM (0)
 #define TO   (1)
 
-#define PIXEL_FORMAT (GL_RGB)
+#define PIXEL_FORMAT (GL_RGBA)
 
 #ifdef GL_TRANSITION_USING_EGL
 static const EGLint configAttribs[] = {
@@ -345,7 +345,7 @@ static void setup_tex(AVFilterLink *fromLink)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, NULL);
 
     glUniform1i(glGetUniformLocation(c->program, "from"), 0);
   }
@@ -360,7 +360,7 @@ static void setup_tex(AVFilterLink *fromLink)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, NULL);
 
     glUniform1i(glGetUniformLocation(c->program, "to"), 1);
   }
@@ -544,11 +544,11 @@ static AVFrame *apply_transition(FFFrameSync *fs,
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, c->from);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, fromFrame->data[0]);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, fromFrame->data[0]);
 
   glActiveTexture(GL_TEXTURE0 + 1);
   glBindTexture(GL_TEXTURE_2D, c->to);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, toLink->w, toLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, toFrame->data[0]);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, toLink->w, toLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, toFrame->data[0]);
 
   glDrawArrays(GL_TRIANGLES, 0, 6);
   glReadPixels(0, 0, outLink->w, outLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, (GLvoid *)outFrame->data[0]);
@@ -634,7 +634,7 @@ static av_cold void uninit(AVFilterContext *ctx) {
 static int query_formats(AVFilterContext *ctx)
 {
   static const enum AVPixelFormat formats[] = {
-    AV_PIX_FMT_RGB24,
+    AV_PIX_FMT_RGBA,
     AV_PIX_FMT_NONE
   };
 
