@@ -190,22 +190,19 @@ static int clear_padding(AVFrame *frame)
   if(!padding) return 0;
 
   
-  char *data = av_malloc(width * frame->height+1);
-  char *in = frame->data[0];
-  char *out = data;
+  uint8_t *data = av_malloc(width * frame->height+1);
+  uint8_t *in = frame->data[0];
+  uint8_t *out = data;
 
-  if(data == NULL){
-    printf("mallocerror!\n");
-    exit(-1);
-  }
-  int i = 0;
-  for(;i<frame->height;i++){
+  
+  for(int i = 0;i<frame->height;i++){
     memcpy(out, in, width);
     out += width;
     in += linesize;
   }
-  frame->data[0] = data;
-  free(data);
+  out = '\0';
+  memcpy(frame->data[0],data,width * frame->height+1);
+  av_free(data);
   return 0;
 }
 //恢复图片尾部padding
@@ -216,20 +213,21 @@ static int add_padding(AVFrame *frame)
   int padding = linesize - width;
   if(!padding) return 0;
 
-  char *data = av_malloc(linesize * frame->height+1);
+  uint8_t *data = av_malloc(linesize * frame->height+1);
 
-  char *in = frame->data[0];
-  char *out = data;
+  uint8_t *in = frame->data[0];
+  uint8_t *out = data;
 
   memset(data,0,linesize * frame->height);
-  int i = 0;
-  for(;i<frame->height;i++){
+
+  for(int i = 0; i < frame->height; i++){
     memcpy(out, in, width);
     in += width;
     out += linesize;
   }
-  frame->data[0] = data;
-  free(data);
+  out = '\0';
+  memcpy(frame->data[0],data,linesize * frame->height+1);
+  av_free(data);
   return 0;
 }
 
@@ -593,8 +591,6 @@ static AVFrame *apply_transition(FFFrameSync *fs,
   const float progress = FFMAX(0.0f, FFMIN(1.0f, ts / c->duration));
   // av_log(ctx, AV_LOG_ERROR, "transition '%s' %llu %f %f\n", c->source, fs->pts - c->first_pts, ts, progress);
   glUniform1f(c->progress, progress);
-
-
 
 
   glActiveTexture(GL_TEXTURE0);
