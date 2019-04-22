@@ -35,6 +35,7 @@
 #define TO   (1)
 
 #define PIXEL_FORMAT (GL_RGBA)
+#define PIXEL_SIZE 4
 
 #ifdef GL_TRANSITION_USING_EGL
 static const EGLint configAttribs[] = {
@@ -180,6 +181,57 @@ static StringArray_t parseQueryString (const char *str_query)  {
   return sa;
 }
 
+//去除图片尾部padding
+static int clear_padding(AVFrame *frame)
+{
+  int linesize = frame->linesize[0];
+  int width = frame->width*PIXEL_SIZE;//宽（byte)
+  int padding = linesize - width;
+  if(!padding) return 0;
+
+  
+  char *data = av_malloc(width * frame->height+1);
+  char *in = frame->data[0];
+  char *out = data;
+
+  if(data == NULL){
+    printf("mallocerror!\n");
+    exit(-1);
+  }
+  int i = 0;
+  for(;i<frame->height;i++){
+    memcpy(out, in, width);
+    out += width;
+    in += linesize;
+  }
+  frame->data[0] = data;
+  free(data);
+  return 0;
+}
+//恢复图片尾部padding
+static int add_padding(AVFrame *frame)
+{
+  int linesize = frame->linesize[0];
+  int width = frame->width*PIXEL_SIZE;
+  int padding = linesize - width;
+  if(!padding) return 0;
+
+  char *data = av_malloc(linesize * frame->height+1);
+
+  char *in = frame->data[0];
+  char *out = data;
+
+  memset(data,0,linesize * frame->height);
+  int i = 0;
+  for(;i<frame->height;i++){
+    memcpy(out, in, width);
+    in += width;
+    out += linesize;
+  }
+  frame->data[0] = data;
+  free(data);
+  return 0;
+}
 
 static int strToInt(char *to_convert, int *i) {
   char *p = to_convert;
@@ -514,7 +566,7 @@ static int setup_gl(AVFilterLink *inLink)
 static AVFrame *apply_transition(FFFrameSync *fs,
                                  AVFilterContext *ctx,
                                  AVFrame *fromFrame,
-                                 const AVFrame *toFrame)
+                                 AVFrame *toFrame)
 {
   GLTransitionContext *c = ctx->priv;
   AVFilterLink *fromLink = ctx->inputs[FROM];
@@ -542,16 +594,26 @@ static AVFrame *apply_transition(FFFrameSync *fs,
   // av_log(ctx, AV_LOG_ERROR, "transition '%s' %llu %f %f\n", c->source, fs->pts - c->first_pts, ts, progress);
   glUniform1f(c->progress, progress);
 
+
+
+
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, c->from);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, fromLink->w, fromLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, fromFrame->data[0]);
+  
 
+  clear_padding(fromFrame);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0, fromLink->w, fromLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, fromFrame->data[0]);
+  
   glActiveTexture(GL_TEXTURE0 + 1);
   glBindTexture(GL_TEXTURE_2D, c->to);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, toLink->w, toLink->h, 0, PIXEL_FORMAT, GL_UNSIGNED_BYTE, toFrame->data[0]);
+
+  clear_padding(toFrame);
+  glTexSubImage2D(GL_TEXTURE_2D, 0,0,0, toLink->w, toLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, toFrame->data[0]);
 
   glDrawArrays(GL_TRIANGLES, 0, 6);
   glReadPixels(0, 0, outLink->w, outLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, (GLvoid *)outFrame->data[0]);
+
+  add_padding(outFrame);
 
   av_frame_free(&fromFrame);
 
