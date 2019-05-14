@@ -146,6 +146,11 @@ typedef struct {
 
 FRAMESYNC_DEFINE_CLASS(gltransition, GLTransitionContext, fs);
 
+static void strSplitInt(const char *strLiteral, const char *delimiter, int *pOutputs, int len);
+static void strSplitFloat(const char *strLiteral, const char *delimiter, float *pOutputs, int len);
+static int parseGLSLIntVector(const char* str,int *pOutput,int *pShape);
+static int parseGLSLFloatVector(const char* str,float *pOutput,int *pShape);
+
 static StringArray_t parseQueryString (const char *str_query)  {
   StringArray_t sa;
   int offset = 0;
@@ -153,7 +158,7 @@ static StringArray_t parseQueryString (const char *str_query)  {
   int cursor_start = 0;
   int cursor_end= 0;
   int cnt_seg = 1;
-  auto len = (int) (strlen(str_query));
+  int len = (int) (strlen(str_query));
 
   for (int i = 0; i < len; i++) {
     if (str_query[i] == '=' || str_query[i] == '&') {
@@ -181,55 +186,7 @@ static StringArray_t parseQueryString (const char *str_query)  {
   return sa;
 }
 
-//去除图片尾部padding
-static int clear_padding(AVFrame *frame)
-{
-  int linesize = frame->linesize[0];
-  int width = frame->width*PIXEL_SIZE;//宽（byte)
-  int padding = linesize - width;
-  if(!padding) return 0;
 
-  
-  uint8_t *data = av_malloc(width * frame->height+1);
-  uint8_t *in = frame->data[0];
-  uint8_t *out = data;
-
-  
-  for(int i = 0;i<frame->height;i++){
-    memcpy(out, in, width);
-    out += width;
-    in += linesize;
-  }
-  out = '\0';
-  memcpy(frame->data[0],data,width * frame->height+1);
-  av_free(data);
-  return 0;
-}
-//恢复图片尾部padding
-static int add_padding(AVFrame *frame)
-{
-  int linesize = frame->linesize[0];
-  int width = frame->width*PIXEL_SIZE;
-  int padding = linesize - width;
-  if(!padding) return 0;
-
-  uint8_t *data = av_malloc(linesize * frame->height+1);
-
-  uint8_t *in = frame->data[0];
-  uint8_t *out = data;
-
-  memset(data,0,linesize * frame->height);
-
-  for(int i = 0; i < frame->height; i++){
-    memcpy(out, in, width);
-    in += width;
-    out += linesize;
-  }
-  out = '\0';
-  memcpy(frame->data[0],data,linesize * frame->height+1);
-  av_free(data);
-  return 0;
-}
 
 static int strToInt(char *to_convert, int *i) {
   char *p = to_convert;
@@ -253,18 +210,20 @@ static int strToFloat(char *to_convert, float *f) {
 
 #define STRING_SPLIT_DEFINE(type, Type) \
 static void strSplit##Type(const char *strLiteral, const char *delimiter, type *pOutputs, int len) { \
-  char *token, *str, *tofree;                                                           \
+  char *token, *str, *toFree;                                                           \
+  char *ptr = NULL;                                                                     \
   int offset = 0;                                                                       \
-  tofree = str = strdup(strLiteral);                                                    \
-  while ((token = strtok(&str, delimiter)) && offset < len) {                           \
+  toFree = str = strdup(strLiteral);                                                    \
+  while ((token = strtok_r(str, delimiter,&ptr)) && offset < len) {                     \
     type t;                                                                             \
     if (!strTo##Type(token, &t)) {                                                      \
       t = (type)0;                                                                      \
     }                                                                                   \
-    pOutputs[offset] = t;                                                                \
+    pOutputs[offset] = t;                                                               \
     offset++;                                                                           \
+    str=NULL;                                                                           \
   }                                                                                     \
-  free(tofree);                                                                         \
+  free(toFree);                                                                         \
 }
 
 STRING_SPLIT_DEFINE(int, Int)
@@ -272,7 +231,7 @@ STRING_SPLIT_DEFINE(float, Float)
 
 //assume that the string is compact
 #define PARSE_GLSL_VECTOR(glType, typeLen, type, Type)                      \
-static int parseGlSL##Type##Vector(const char* str,type *pOutput,int *pShape){      \
+static int parseGLSL##Type##Vector(const char* str,type *pOutput,int *pShape){      \
   int len = (int)strlen(str);                                               \
   int bodyPos = typeLen + 2;                                                \
   if (memcmp(str,glType, typeLen) != 0) {                                   \
@@ -446,7 +405,7 @@ static void setup_uniforms(AVFilterLink *fromLink)
           int vecShape = 0;
           int intVec[4] = {0};
           float floatVec[4] = {0.0};
-          if (parseGlSLFloatVector(sa.strings[i + 1], floatVec, &vecShape)) {
+          if (parseGLSLFloatVector(sa.strings[i + 1], floatVec, &vecShape)) {
             switch (vecShape) {
               case 2:
                 glUniform2f(location, floatVec[0], floatVec[1]);
@@ -460,7 +419,7 @@ static void setup_uniforms(AVFilterLink *fromLink)
               default:
                 break;
             }
-          } else if (parseGlSLIntVector(sa.strings[i + 1], intVec, &vecShape)) {
+          } else if (parseGLSLIntVector(sa.strings[i + 1], intVec, &vecShape)) {
             switch (vecShape) {
               case 2:
                 glUniform2i(location, intVec[0], intVec[1]);
@@ -595,21 +554,22 @@ static AVFrame *apply_transition(FFFrameSync *fs,
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, c->from);
-  
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, fromFrame->linesize[0] / PIXEL_SIZE);
 
-  clear_padding(fromFrame);
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0, fromLink->w, fromLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, fromFrame->data[0]);
   
   glActiveTexture(GL_TEXTURE0 + 1);
   glBindTexture(GL_TEXTURE_2D, c->to);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, toFrame->linesize[0] / PIXEL_SIZE);
 
-  clear_padding(toFrame);
   glTexSubImage2D(GL_TEXTURE_2D, 0,0,0, toLink->w, toLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, toFrame->data[0]);
 
   glDrawArrays(GL_TRIANGLES, 0, 6);
+  glPixelStorei(GL_PACK_ROW_LENGTH, outFrame->linesize[0] / PIXEL_SIZE);
   glReadPixels(0, 0, outLink->w, outLink->h, PIXEL_FORMAT, GL_UNSIGNED_BYTE, (GLvoid *)outFrame->data[0]);
 
-  add_padding(outFrame);
+  glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
   av_frame_free(&fromFrame);
 
